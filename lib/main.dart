@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:td_display/tpsfDisplay.dart';
+import 'package:td_display/tpsf_display.dart';
 import 'package:tt_bindings/tt_bindings.dart';
 
 void main() {
