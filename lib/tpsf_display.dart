@@ -11,11 +11,19 @@ class TPSFDisplay extends StatelessWidget {
     return StreamBuilder(
       stream: tpsfStream,
       builder: (context, snapshot) {
+        if(snapshot.connectionState == ConnectionState.none) {
+          return const Center(
+            child: Text('No measurement started'),
+          );
+        }
         if (!snapshot.hasData) {
           return const Center(
             child: CircularProgressIndicator(),
           );
         }
+
+        final dataList = snapshot.data!.entries.toList();
+        dataList.sort((a, b) => a.key.compareTo(b.key));
         return SfCartesianChart(
           primaryYAxis: const LogarithmicAxis(),
           legend: const Legend(
@@ -24,7 +32,7 @@ class TPSFDisplay extends StatelessWidget {
           series: [
             LineSeries<MapEntry<int, int>, int>(
               animationDuration: 0,
-              dataSource: snapshot.data!.entries.toList(),
+              dataSource: dataList,
               xValueMapper: (pair, index) => pair.key,
               yValueMapper: (pair, index) {
                 return pair.value;
