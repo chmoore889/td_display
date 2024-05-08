@@ -66,8 +66,8 @@ class TPSFDisplay extends StatelessWidget {
             Expanded(
               child: SfCartesianChart(
                 primaryYAxis: const NumericAxis(
-                  minimum: 0.95,
-                  maximum: 1.2,
+                  // minimum: 0.95,
+                  // maximum: 1.2,
                 ),
                 primaryXAxis: const LogarithmicAxis(
                   minimum: 1e-6,
