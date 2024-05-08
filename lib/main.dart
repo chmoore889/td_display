@@ -15,7 +15,7 @@ class MainApp extends StatefulWidget {
 }
 
 class _MainAppState extends State<MainApp> {
-  Stream<Map<int, int>>? stream;
+  Stream<(Map<int, int>, Iterable<CorrelationPair>)>? stream;
 
   get isRunning => stream != null;
 

@@ -1,8 +1,9 @@
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
+import 'package:tt_bindings/tt_bindings.dart';
 
 class TPSFDisplay extends StatelessWidget {
-  final Stream<Map<int, int>>? tpsfStream;
+  final Stream<(Map<int, int>, Iterable<CorrelationPair>)>? tpsfStream;
 
   const TPSFDisplay({super.key, this.tpsfStream});
 
@@ -22,7 +23,7 @@ class TPSFDisplay extends StatelessWidget {
           );
         }
 
-        final dataList = snapshot.data!.entries.toList();
+        final dataList = snapshot.data!.$1.entries.toList();
         dataList.sort((a, b) => a.key.compareTo(b.key));
         return SfCartesianChart(
           primaryYAxis: const LogarithmicAxis(),
