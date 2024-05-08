@@ -8,6 +8,7 @@ environment:
 
 dependencies:
   syncfusion_flutter_charts: ^25.1.41+2
+  fluent_ui: ^4.8.7
   tt_bindings:
     path: ../tt_bindings
 

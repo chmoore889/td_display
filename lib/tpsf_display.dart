@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:fluent_ui/fluent_ui.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 
 class TPSFDisplay extends StatelessWidget {
@@ -16,9 +16,9 @@ class TPSFDisplay extends StatelessWidget {
             child: Text('No measurement started'),
           );
         }
-        if (!snapshot.hasData) {
+        if (!snapshot.hasData || snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
-            child: CircularProgressIndicator(),
+            child: ProgressRing(),
           );
         }
 
