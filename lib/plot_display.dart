@@ -5,8 +5,14 @@ import 'package:tt_bindings/tt_bindings.dart';
 class TPSFDisplay extends StatelessWidget {
   final Stream<(Map<int, int>, Iterable<CorrelationPair>)>? tpsfStream;
   final double integrationTimeSeconds;
+  final GatingRange gatingRange;
 
-  const TPSFDisplay({super.key, required this.tpsfStream, required this.integrationTimeSeconds});
+  const TPSFDisplay({
+    super.key,
+    required this.tpsfStream,
+    required this.integrationTimeSeconds,
+    required this.gatingRange,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -46,14 +52,22 @@ class TPSFDisplay extends StatelessWidget {
                       return pair.value;
                     },
                   ),
+                  AreaSeries<MapEntry<int, int>, int>(
+                    animationDuration: 0,
+                    dataSource: dataList.where((element) => gatingRange.inRange(element.key)).toList(),
+                    xValueMapper: (pair, index) => pair.key,
+                    yValueMapper: (pair, index) {
+                      return pair.value;
+                    },
+                  ),
                 ],
               ),
             ),
             Expanded(
               child: SfCartesianChart(
                 primaryYAxis: const NumericAxis(
-                  minimum: 0.9,
-                  maximum: 1.1,
+                  minimum: 0.95,
+                  maximum: 1.2,
                 ),
                 primaryXAxis: const LogarithmicAxis(
                   minimum: 1e-6,
