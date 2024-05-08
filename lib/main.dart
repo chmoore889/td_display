@@ -1,6 +1,6 @@
 import 'package:fluent_ui/fluent_ui.dart';
 import 'package:flutter/material.dart';
-import 'package:td_display/tpsf_display.dart';
+import 'package:td_display/plot_display.dart';
 import 'package:tt_bindings/tt_bindings.dart';
 
 void main() {
@@ -22,7 +22,7 @@ class _MainAppState extends State<MainApp> {
   static const int laserPeriod = 12500;
 
   double integrationTimeSeconds = 1.0;
-  GatingRange gatingRange = const GatingRange(0, laserPeriod);
+  GatingRange gatingRange = const GatingRange(8000, 9000);
 
   @override
   Widget build(BuildContext context) {
@@ -96,6 +96,7 @@ class _MainAppState extends State<MainApp> {
                 Expanded(
                   child: TPSFDisplay(
                     tpsfStream: stream,
+                    integrationTimeSeconds: integrationTimeSeconds,
                   ),
                 ),
               ],
