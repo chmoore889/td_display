@@ -24,6 +24,11 @@ class _TPSFDisplayState extends State<TPSFDisplay> {
     return StreamBuilder(
       stream: widget.tpsfStream,
       builder: (context, snapshot) {
+        if(snapshot.hasError) {
+          return Center(
+            child: Text('Error: ${snapshot.error}'),
+          );
+        }
         if(snapshot.connectionState == ConnectionState.none) {
           return const Center(
             child: Text('No measurement started'),
