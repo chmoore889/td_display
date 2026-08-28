@@ -20,7 +20,7 @@ class MainApp extends StatefulWidget {
 class _MainAppState extends State<MainApp> {
   Stream<(Map<int, int>, Iterable<CorrelationPair>)>? stream;
 
-  get isRunning => stream != null;
+  bool get isRunning => stream != null;
 
   LaserFrequency laserFrequency = LaserFrequency.eighty;
 
