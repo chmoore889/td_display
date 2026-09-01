@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:filepicker_windows/filepicker_windows.dart';
 import 'package:fluent_ui/fluent_ui.dart';
@@ -6,7 +7,8 @@ import 'package:tt_bindings/tt_bindings.dart';
 
 class MeasurementInput extends StatefulWidget {
   final PostProcessingParams processingParams;
-  final ValueChanged<Stream<(Map<int, int>, Iterable<CorrelationPair>)>?>? streamCallback;
+  final ValueChanged<Stream<(Map<int, int>, Iterable<CorrelationPair>)>?>?
+      streamCallback;
   final LaserFrequency initialLaserFrequency;
   final ValueChanged<LaserFrequency>? laserFrequencyCallback;
   final bool isRunning;
@@ -35,6 +37,57 @@ class _MeasurementInputState extends State<MeasurementInput> {
   EdgeType detectorEdge = EdgeType.rising;
   double laserChannelVoltage = -0.5;
   double detectorChannelVoltage = 0.9;
+  int hardwareDelay = 0;
+
+  late SharedPreferences prefs;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      laserChannel = prefs.getInt('laserChannel') ?? 1;
+      laserChannelVoltage = prefs.getDouble('laserChannelVoltage') ?? -0.5;
+      detectorChannelVoltage = prefs.getDouble('detectorChannelVoltage') ?? 0.9;
+
+      final savedDetChannels = prefs.getStringList('detectorChannels');
+      if (savedDetChannels != null) {
+        detectorChannels = savedDetChannels.map((e) => int.parse(e)).toList();
+      }
+
+      final laserFreqIndex = prefs.getInt('laserFrequency');
+      if (laserFreqIndex != null) {
+        laserFrequency = LaserFrequency.values[laserFreqIndex];
+        // Ensure parent widget updates its laser frequency state
+        widget.laserFrequencyCallback?.call(laserFrequency);
+      }
+
+      final lEdge = prefs.getInt('laserEdge');
+      if (lEdge != null) laserEdge = EdgeType.values[lEdge];
+
+      final dEdge = prefs.getInt('detectorEdge');
+      if (dEdge != null) detectorEdge = EdgeType.values[dEdge];
+
+      hardwareDelay = prefs.getInt('hardwareDelay') ?? 0;
+    });
+  }
+
+  Future<void> _saveSettings() async {
+    await prefs.setInt('laserChannel', laserChannel);
+    await prefs.setDouble('laserChannelVoltage', laserChannelVoltage);
+    await prefs.setDouble('detectorChannelVoltage', detectorChannelVoltage);
+    await prefs.setStringList(
+        'detectorChannels', detectorChannels.map((e) => e.toString()).toList());
+    await prefs.setInt('laserFrequency', laserFrequency.index);
+    await prefs.setInt('laserEdge', laserEdge.index);
+    await prefs.setInt('detectorEdge', detectorEdge.index);
+    await prefs.setInt('hardwareDelay', hardwareDelay);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +105,11 @@ class _MeasurementInputState extends State<MeasurementInput> {
                     child: Text(e.toString()),
                   );
                 }).toList(),
-                onChanged: (val) => widget.laserFrequencyCallback?.call(laserFrequency = val ?? laserFrequency),
+                onChanged: (val) {
+                  widget.laserFrequencyCallback
+                      ?.call(laserFrequency = val ?? laserFrequency);
+                  _saveSettings();
+                },
               ),
             ),
             Padding(
@@ -60,9 +117,8 @@ class _MeasurementInputState extends State<MeasurementInput> {
               child: IconButton(
                 icon: const Icon(FluentIcons.fabric_folder),
                 onPressed: () {
-                  final file = DirectoryPicker()
-                    ..title = 'Select a directory';
-                      
+                  final file = DirectoryPicker()..title = 'Select a directory';
+
                   final result = file.getDirectory();
                   if (result != null) {
                     measurementDirectory = result;
@@ -79,14 +135,15 @@ class _MeasurementInputState extends State<MeasurementInput> {
                   Checkbox(
                     checked: enableFileOutput,
                     onChanged: (newState) {
-                      if(newState != null) {
-                        if(newState && measurementDirectory == null) {
+                      if (newState != null) {
+                        if (newState && measurementDirectory == null) {
                           showDialog(
                             context: context,
                             builder: (context) {
                               return ContentDialog(
                                 title: const Text('No directory selected'),
-                                content: const Text('Please select a directory before enabling file output'),
+                                content: const Text(
+                                    'Please select a directory before enabling file output'),
                                 actions: [
                                   FilledButton(
                                     onPressed: () {
@@ -112,164 +169,191 @@ class _MeasurementInputState extends State<MeasurementInput> {
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Button(
-                onPressed: () {
+                onPressed: widget.isRunning ? null : () {
                   showDialog(
                     context: context,
                     builder: (context) {
                       return ContentDialog(
                         title: const Text('Set channels'),
-                        content: StatefulBuilder(
-                          builder: (context, setState) {
-                            return Row(
-                              mainAxisSize: MainAxisSize.max,
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Text('Laser:'),
-                                      Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Text('Edge and Voltage'),
-                                            Row(
-                                              children: [
-                                                EdgeSelector(
-                                                  defaultEdge: laserEdge,
-                                                  onChanged: (edge) {
-                                                    laserEdge = edge;
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                            SizedBox(
-                                              width: 200,
-                                              child: NumberBox(
-                                                value: laserChannelVoltage,
-                                                onChanged: (newVal) {
-                                                  if(newVal != null) {
-                                                    laserChannelVoltage = newVal;
-                                                  }
-                                                },
-                                                smallChange: 0.1,
-                                                largeChange: 1,
-                                                mode: SpinButtonPlacementMode.inline,
-                                                clearButton: false,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const Text('Channel Select'),
-                                      SizedBox(
-                                        width: 100,
-                                        child: NumberBox(
-                                          min: 1,
-                                          max: 8,
-                                          value: laserChannel,
-                                          onChanged: (newVal) {
-                                            if(newVal == null) {
-                                              return;
-                                            }
-                                            setState(() {
-                                              laserChannel = newVal;
-                                              if(detectorChannels.contains(newVal)) {
-                                                detectorChannels.remove(newVal);
-                                              }
-                                            });
-                                          },
-                                          clearButton: false,
-                                          mode: SpinButtonPlacementMode.inline,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 20),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Text('Detectors:'),
-                                      Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            const Text('Edge and Voltage'),
-                                            Row(
-                                              children: [
-                                                EdgeSelector(
-                                                  defaultEdge: detectorEdge,
-                                                  onChanged: (edge) {
-                                                    detectorEdge = edge;
-                                                  },
-                                                ),
-                                              ],
-                                            ),
-                                            SizedBox(
-                                              width: 200,
-                                              child: NumberBox(
-                                                value: detectorChannelVoltage,
-                                                onChanged: (newVal) {
-                                                  if(newVal != null) {
-                                                    detectorChannelVoltage = newVal;
-                                                  }
-                                                },
-                                                smallChange: 0.1,
-                                                largeChange: 1,
-                                                mode: SpinButtonPlacementMode.inline,
-                                                clearButton: false,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const Text('Channel Select'),
-                                      Wrap(
+                        content: StatefulBuilder(builder: (context, setState) {
+                          return Row(
+                            mainAxisSize: MainAxisSize.max,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('Laser:'),
+                                    Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
-                                          for (var i = 1; i <= 8; i++)
-                                            Padding(
-                                              padding: const EdgeInsets.all(8.0),
-                                              child: Column(
-                                                children: [
-                                                  Text('$i'),
-                                                  Checkbox(
-                                                    checked: detectorChannels.contains(i),
-                                                    onChanged: laserChannel == i ? null : (newVal) {
-                                                      if(newVal != null) {
-                                                        setState(() {
-                                                          if(newVal) {
-                                                            detectorChannels.add(i);
-                                                          }
-                                                          else {
-                                                            detectorChannels.remove(i);
-                                                          }
-                                                        });
-                                                      }
-                                                    },
-                                                  ),
-                                                ],
+                                          const Text('Edge and Voltage'),
+                                          Row(
+                                            children: [
+                                              EdgeSelector(
+                                                defaultEdge: laserEdge,
+                                                onChanged: (edge) {
+                                                  laserEdge = edge;
+                                                },
                                               ),
+                                            ],
+                                          ),
+                                          SizedBox(
+                                            width: 200,
+                                            child: NumberBox(
+                                              value: laserChannelVoltage,
+                                              onChanged: (newVal) {
+                                                if (newVal != null) {
+                                                  laserChannelVoltage = newVal;
+                                                }
+                                              },
+                                              smallChange: 0.1,
+                                              largeChange: 1,
+                                              mode: SpinButtonPlacementMode
+                                                  .inline,
+                                              clearButton: false,
                                             ),
+                                          ),
                                         ],
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                    const Text('Channel Select'),
+                                    SizedBox(
+                                      width: 100,
+                                      child: NumberBox(
+                                        min: 1,
+                                        max: 8,
+                                        value: laserChannel,
+                                        onChanged: (newVal) {
+                                          if (newVal == null) {
+                                            return;
+                                          }
+                                          setState(() {
+                                            laserChannel = newVal;
+                                            if (detectorChannels
+                                                .contains(newVal)) {
+                                              detectorChannels.remove(newVal);
+                                            }
+                                          });
+                                        },
+                                        clearButton: false,
+                                        mode: SpinButtonPlacementMode.inline,
+                                      ),
+                                    ),
+                                    const Text('Hardware Phase Shift (ps)'),
+                                    SizedBox(
+                                      width: 200,
+                                      child: NumberBox<int>(
+                                        value: hardwareDelay,
+                                        onChanged: (newVal) {
+                                          if (newVal != null) {
+                                            setState(() {
+                                              hardwareDelay = newVal;
+                                            });
+                                          }
+                                        },
+                                        smallChange: 10,
+                                        largeChange: 100,
+                                        mode: SpinButtonPlacementMode.inline,
+                                        clearButton: false,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ],
-                            );
-                          }
-                        ),
+                              ),
+                              const SizedBox(width: 20),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Text('Detectors:'),
+                                    Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          const Text('Edge and Voltage'),
+                                          Row(
+                                            children: [
+                                              EdgeSelector(
+                                                defaultEdge: detectorEdge,
+                                                onChanged: (edge) {
+                                                  detectorEdge = edge;
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                          SizedBox(
+                                            width: 200,
+                                            child: NumberBox(
+                                              value: detectorChannelVoltage,
+                                              onChanged: (newVal) {
+                                                if (newVal != null) {
+                                                  detectorChannelVoltage =
+                                                      newVal;
+                                                }
+                                              },
+                                              smallChange: 0.1,
+                                              largeChange: 1,
+                                              mode: SpinButtonPlacementMode
+                                                  .inline,
+                                              clearButton: false,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Text('Channel Select'),
+                                    Wrap(
+                                      children: [
+                                        for (var i = 1; i <= 8; i++)
+                                          Padding(
+                                            padding: const EdgeInsets.all(8.0),
+                                            child: Column(
+                                              children: [
+                                                Text('$i'),
+                                                Checkbox(
+                                                  checked: detectorChannels
+                                                      .contains(i),
+                                                  onChanged: laserChannel == i
+                                                      ? null
+                                                      : (newVal) {
+                                                          if (newVal != null) {
+                                                            setState(() {
+                                                              if (newVal) {
+                                                                detectorChannels
+                                                                    .add(i);
+                                                              } else {
+                                                                detectorChannels
+                                                                    .remove(i);
+                                                              }
+                                                            });
+                                                          }
+                                                        },
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        }),
                         actions: [
                           FilledButton(
                             onPressed: () async {
-                              if(detectorChannels.isEmpty) {
-                                displayInfoBar(context, builder: (context, close) {
+                              if (detectorChannels.isEmpty) {
+                                displayInfoBar(context,
+                                    builder: (context, close) {
                                   return InfoBar(
                                     title: const Text('No detector channels'),
                                     content: const Text(
@@ -281,8 +365,8 @@ class _MeasurementInputState extends State<MeasurementInput> {
                                     severity: InfoBarSeverity.error,
                                   );
                                 });
-                              }
-                              else {
+                              } else {
+                                _saveSettings();
                                 Navigator.of(context).pop();
                               }
                             },
@@ -302,10 +386,9 @@ class _MeasurementInputState extends State<MeasurementInput> {
           padding: const EdgeInsets.all(8.0),
           child: FilledButton(
             onPressed: () {
-              if(widget.isRunning) {
+              if (widget.isRunning) {
                 widget.streamCallback?.call(null);
-              }
-              else {
+              } else {
                 Stream<(Map<int, int>, Iterable<CorrelationPair>)>? newStream;
                 try {
                   newStream = startMeasurement(
@@ -313,13 +396,17 @@ class _MeasurementInputState extends State<MeasurementInput> {
                       laserChannel: laserEdge.setChannel(laserChannel),
                       laserPeriod: laserFrequency.periodInPs,
                       laserTriggerVoltage: laserChannelVoltage,
-                      detectorChannels: detectorChannels.map((e) => detectorEdge.setChannel(e)).toList(),
+                      detectorChannels: detectorChannels
+                          .map((e) => detectorEdge.setChannel(e))
+                          .toList(),
                       detectorTriggerVoltage: detectorChannelVoltage,
-                      saveDirectory: enableFileOutput ? measurementDirectory : null,
+                      hardwareDelayPs: hardwareDelay,
+                      saveDirectory:
+                          enableFileOutput ? measurementDirectory : null,
                     ),
                     widget.processingParams,
                   );
-                } catch(e) {
+                } catch (e) {
                   //Do nothing
                 }
                 widget.streamCallback?.call(newStream);
@@ -357,7 +444,7 @@ class _EdgeSelectorState extends State<EdgeSelector> {
         ToggleButton(
           checked: edgeType == EdgeType.falling,
           onChanged: (newVal) {
-            if(newVal) {
+            if (newVal) {
               setState(() {
                 edgeType = EdgeType.falling;
               });
@@ -372,7 +459,7 @@ class _EdgeSelectorState extends State<EdgeSelector> {
         ToggleButton(
           checked: edgeType == EdgeType.rising,
           onChanged: (newVal) {
-            if(newVal) {
+            if (newVal) {
               setState(() {
                 edgeType = EdgeType.rising;
               });
@@ -394,10 +481,9 @@ enum EdgeType {
   falling;
 
   int setChannel(int channel) {
-    if(this == EdgeType.rising) {
+    if (this == EdgeType.rising) {
       return channel.abs();
-    }
-    else {
+    } else {
       return -channel.abs();
     }
   }
@@ -407,7 +493,7 @@ enum LaserFrequency {
   twenty(20),
   forty(40),
   eighty(80);
-  
+
   const LaserFrequency(this.frequency);
   final int frequency;
 

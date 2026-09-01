@@ -12,6 +12,7 @@ dependencies:
   filepicker_windows: ^3.0.2
   tt_bindings:
     path: ../tt_bindings
+  shared_preferences: ^2.5.5
 
   flutter:
     sdk: flutter
