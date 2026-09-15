@@ -27,7 +27,7 @@ class _MainAppState extends State<MainApp> {
   late PostProcessingParams processingParams = PostProcessingParams(
     integrationTimeSeconds: 1.0,
     gatingRange: GatingRange(0, laserFrequency.periodInPs),
-    activeChannel: 2,
+    activeChannel: 1,
   );
 
   Directory? measurementDirectory;
